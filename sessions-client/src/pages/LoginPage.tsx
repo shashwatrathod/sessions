@@ -37,28 +37,13 @@ export default function LoginPage() {
           animate={{ scale: 1, opacity: 1 }}
           transition={{ delay: 0.1, duration: 0.5 }}
         >
-          <svg
-            viewBox="0 0 40 40"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
+          <img
+            src="/logo.svg"
+            alt="Sessions Logo"
             width="40"
             height="40"
-          >
-            <circle cx="20" cy="20" r="18" fill="#1DB954" opacity="0.15" />
-            <path
-              d="M12 20c0-4.4 3.6-8 8-8s8 3.6 8 8-3.6 8-8 8-8-3.6-8-8z"
-              fill="none"
-              stroke="#1DB954"
-              strokeWidth="1.5"
-            />
-            <path
-              d="M16 18l3 3-3 3M21 15v10"
-              stroke="#1DB954"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
+            style={{ borderRadius: "8px" }}
+          />
           <span className="logo-text">Sessions</span>
         </motion.div>
 

@@ -13,17 +13,19 @@ datasource db {
 }
 
 model User {
-  id             String        @id // Spotify user ID
+  id             String         @id // Spotify user ID
   displayName    String
   email          String?
   avatarUrl      String?
   accessToken    String
   refreshToken   String
   tokenExpiresAt DateTime
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
   tracks         PlayHistory[]
   savedSessions  SavedSession[]
+
+  @@map("users")
 }
 
 model PlayHistory {
@@ -41,19 +43,30 @@ model PlayHistory {
 
   @@unique([userId, playedAt]) // prevent duplicate play events per user
   @@index([userId, playedAt])
+  @@map("play_histories")
 }
 
 model SavedSession {
-  id                String   @id @default(cuid())
-  name              String
-  createdAt         DateTime @default(now())
-  startTime         DateTime
-  endTime           DateTime
-  spotifyPlaylistId String?
+  id                 String   @id @default(cuid())
+  name               String
+  createdAt          DateTime @default(now())
+  startTime          DateTime
+  endTime            DateTime
+  spotifyPlaylistId  String?
   spotifyPlaylistUrl String?
-  trackUris         String[]
-  userId            String
-  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trackUris          String[]
+  userId             String
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  @@map("saved_sessions")
+}
+
+model Session {
+  sid    String   @id @db.VarChar
+  sess   Json     @db.Json
+  expire DateTime @db.Timestamp(6)
+
+  @@index([expire], map: "IDX_session_expire")
+  @@map("session")
 }

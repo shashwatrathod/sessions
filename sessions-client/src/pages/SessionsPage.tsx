@@ -61,22 +61,7 @@ export default function SessionsPage() {
         >
           <div className="flex items-center gap-3">
             <div className="header-logo">
-              <svg viewBox="0 0 24 24" fill="none" width="22" height="22">
-                <circle
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="#1DB954"
-                  strokeWidth="1.5"
-                />
-                <path
-                  d="M9 11l2 2-2 2M13 9v6"
-                  stroke="#1DB954"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
+              <img src="/logo.svg" alt="Sessions Logo" width="24" height="24" />
             </div>
             <span className="header-brand">Sessions</span>
           </div>
