@@ -6,6 +6,7 @@ import LoginPage from "./pages/LoginPage";
 import SessionsPage from "./pages/SessionsPage";
 import SessionDetailPage from "./pages/SessionDetailPage";
 import SavedSessionsPage from "./pages/SavedSessionsPage";
+import { Toaster } from "sonner";
 import "./index.css";
 
 const queryClient = new QueryClient({
@@ -40,6 +41,7 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
+        <Toaster position="top-center" richColors theme="dark" />
         <Routes>
           <Route path="/" element={<LoginPage />} />
           <Route

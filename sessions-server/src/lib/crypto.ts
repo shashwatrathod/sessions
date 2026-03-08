@@ -1,18 +1,27 @@
 import crypto from "crypto";
 
-// Ensure the encryption key is set and is the correct length (32 bytes for AES-256)
+// Ensure the encryption key is exactly 32 bytes for AES-256
 const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY;
-if (!ENCRYPTION_KEY || Buffer.from(ENCRYPTION_KEY, "hex").length !== 32) {
+
+let key: Buffer;
+if (ENCRYPTION_KEY) {
+  // Check if it's already a valid 32-byte hex key (64 hex characters)
+  if (/^[0-9a-fA-F]{64}$/.test(ENCRYPTION_KEY)) {
+    key = Buffer.from(ENCRYPTION_KEY, "hex");
+  } else {
+    // Hash the provided key to ensure it is exactly 32 bytes
+    console.warn(
+      "WARNING: ENCRYPTION_KEY is not a 64-character hex string. Hashing it to 32 bytes.",
+    );
+    key = crypto.createHash("sha256").update(String(ENCRYPTION_KEY)).digest();
+  }
+} else {
   console.warn(
-    "WARNING: ENCRYPTION_KEY is not set or is not 32 bytes hex. Using a fallback key for development ONLY. " +
+    "WARNING: ENCRYPTION_KEY is not set. Using a fallback key for development ONLY. " +
       "Set a secure ENCRYPTION_KEY in production to protect refresh tokens.",
   );
+  key = crypto.scryptSync("fallback-encryption-password-change-me", "salt", 32);
 }
-
-// Fallback key only for dev if not provided (32 bytes hex)
-const key = ENCRYPTION_KEY
-  ? Buffer.from(ENCRYPTION_KEY, "hex")
-  : crypto.scryptSync("fallback-encryption-password-change-me", "salt", 32);
 
 const ALGORITHM = "aes-256-gcm";
 const IV_LENGTH = 16;

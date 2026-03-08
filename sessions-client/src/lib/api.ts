@@ -8,6 +8,7 @@ import type {
   UserSavedTrack,
   SaveSessionResult,
 } from "../types";
+import { toast } from "sonner";
 
 // In local dev, VITE_BACKEND_URL might be unset, so it defaults to relative paths
 // which are caught by the Vite proxy in vite.config.ts.
@@ -15,22 +16,50 @@ import type {
 const BASE_URL = import.meta.env.VITE_BACKEND_URL || "";
 
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(`${BASE_URL}/api${path}`, {
-    credentials: "include", // include the HTTP-only session cookie
-    headers: {
-      "Content-Type": "application/json",
-      "X-Requested-With": "XMLHttpRequest", // CSRF protection
-      ...(options?.headers ?? {}),
-    },
-    ...options,
-  });
+  let toastId: string | number | undefined;
 
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({ error: "Unknown error" }));
-    throw new Error(err.error ?? `HTTP ${response.status}`);
+  // Render free tier cold starts can take > 30s. We warn if it takes > 3s.
+  const timeoutId = setTimeout(() => {
+    toastId = toast.loading(
+      "Backend is starting up. This might take ~30-50 seconds (Render free tier)...",
+      {
+        duration: Number.POSITIVE_INFINITY,
+      },
+    );
+  }, 3000);
+
+  try {
+    const response = await fetch(`${BASE_URL}/api${path}`, {
+      credentials: "include", // include the HTTP-only session cookie
+      headers: {
+        "Content-Type": "application/json",
+        "X-Requested-With": "XMLHttpRequest", // CSRF protection
+        ...(options?.headers ?? {}),
+      },
+      ...options,
+    });
+
+    clearTimeout(timeoutId);
+    if (toastId) {
+      toast.dismiss(toastId);
+      toast.success("Backend is awake!", { duration: 3000 });
+    }
+
+    if (!response.ok) {
+      const err = await response
+        .json()
+        .catch(() => ({ error: "Unknown error" }));
+      throw new Error(err.error ?? `HTTP ${response.status}`);
+    }
+
+    return (await response.json()) as T;
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if (toastId) {
+      toast.dismiss(toastId);
+    }
+    throw error;
   }
-
-  return response.json() as Promise<T>;
 }
 
 // --- Auth ---
