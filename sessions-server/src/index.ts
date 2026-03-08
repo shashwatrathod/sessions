@@ -9,6 +9,7 @@ import historyRouter from "./routes/history";
 import playlistsRouter from "./routes/playlists";
 import sharesRouter from "./routes/shares";
 import { config } from "./config";
+import { errorHandler } from "./middleware/errorHandler";
 
 const app = express();
 const port = config.port;
@@ -72,6 +73,8 @@ app.use("/api/shares", sharesRouter);
 app.get("/api/health", (_req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
+
+app.use(errorHandler);
 
 app.listen(port, () => {
   console.log(`🎵 Sessions server running on http://localhost:${port}`);
