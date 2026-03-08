@@ -9,10 +9,13 @@ import type {
   SaveSessionResult,
 } from "../types";
 
-// All API calls are relative (no host). Vite's proxy (vite.config.ts)
-// forwards /api/* → backend (strips /api prefix before forwarding).
+// In local dev, VITE_BACKEND_URL might be unset, so it defaults to relative paths
+// which are caught by the Vite proxy in vite.config.ts.
+// In production on Vercel, this must be set to `https://api.yourdomain.com`.
+const BASE_URL = import.meta.env.VITE_BACKEND_URL || "";
+
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(`/api${path}`, {
+  const response = await fetch(`${BASE_URL}/api${path}`, {
     credentials: "include", // include the HTTP-only session cookie
     headers: {
       "Content-Type": "application/json",
@@ -34,8 +37,8 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
 export const getMe = () => apiFetch<User>("/auth/me");
 export const logout = () =>
   apiFetch<{ success: boolean }>("/auth/logout", { method: "POST" });
-// /api/auth/login → proxy strips /api → backend /auth/login → Spotify redirect
-export const loginUrl = "/api/auth/login";
+// /api/auth/login → backend /api/auth/login → Spotify redirect
+export const loginUrl = `${BASE_URL}/api/auth/login`;
 
 // --- History ---
 export const syncHistory = () => apiFetch<SyncResult>("/history/sync");
