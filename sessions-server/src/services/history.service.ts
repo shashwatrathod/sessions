@@ -55,7 +55,7 @@ export class HistoryService {
   ) {
     const histories = await prisma.playHistory.findMany({
       where: { userId },
-      orderBy: { playedAt: "desc" },
+      orderBy: { playedAt: "asc" }, // Must be ascending for chronological grouping
       include: { track: true },
     });
 
