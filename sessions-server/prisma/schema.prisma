@@ -15,11 +15,10 @@ datasource db {
 model User {
   id             String         @id // Spotify user ID
   displayName    String
-  email          String?
-  avatarUrl      String?
-  accessToken    String
-  refreshToken   String
-  tokenExpiresAt DateTime
+  email                 String?
+  avatarUrl             String?
+  encryptedRefreshToken String
+  tokenExpiresAt        DateTime
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
   playHistories  PlayHistory[]

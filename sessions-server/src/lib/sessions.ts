@@ -1,4 +1,5 @@
 import { PlayHistory, Track } from "@prisma/client";
+import { config } from "../config";
 
 // PlayHistory joined with its Track record
 export type PlayHistoryWithTrack = PlayHistory & { track: Track };
@@ -14,8 +15,8 @@ export interface Session {
   tags: string[];
 }
 
-// 30 minutes of inactivity = new session
-const SESSION_GAP_MS = 30 * 60 * 1000;
+// Configurable gap between sessions
+const SESSION_GAP_MS = config.sessionGapMinutes * 60 * 1000;
 
 /**
  * Groups a sorted list of PlayHistoryWithTrack records into listening sessions.

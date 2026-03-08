@@ -8,14 +8,15 @@ import authRouter from "./routes/auth";
 import historyRouter from "./routes/history";
 import playlistsRouter from "./routes/playlists";
 import sharesRouter from "./routes/shares";
+import { config } from "./config";
 
 const app = express();
-const port = process.env.PORT ?? 3000;
+const port = config.port;
 
 // CORS — allow the frontend origin with credentials
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL ?? "http://localhost:5173",
+    origin: config.frontendUrl,
     credentials: true,
   }),
 );
@@ -23,9 +24,22 @@ app.use(
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// CSRF Protection Middleware
+// For all state-changing API requests, ensure the request came from our frontend
+// (which sets this custom header on all fetch calls) and not a cross-origin form POST.
+app.use("/api", (req, res, next) => {
+  if (["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) {
+    if (req.headers["x-requested-with"] !== "XMLHttpRequest") {
+      res.status(403).json({ error: "Missing CSRF protection header" });
+      return;
+    }
+  }
+  next();
+});
+
 // Session store backed by Postgres
 const PgSession = connectPgSimple(session);
-const pgPool = new Pool({ connectionString: process.env.DATABASE_URL });
+const pgPool = new Pool({ connectionString: config.databaseUrl });
 
 pgPool.on("error", (err) => console.error("PG pool error:", err));
 
@@ -36,14 +50,14 @@ app.use(
       tableName: "session",
       createTableIfMissing: true,
     }),
-    secret: process.env.SESSION_SECRET ?? "fallback-secret-change-me",
+    secret: config.sessionSecret,
     resave: false,
     saveUninitialized: false,
     cookie: {
-      secure: false, // must be false for http in development
+      secure: config.isProduction,
       httpOnly: true,
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-      sameSite: "lax",
+      maxAge: config.sessionCookieDays * 24 * 60 * 60 * 1000,
+      sameSite: config.cookieSameSite,
     },
   }),
 );

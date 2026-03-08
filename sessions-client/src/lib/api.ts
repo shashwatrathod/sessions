@@ -16,6 +16,7 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
     credentials: "include", // include the HTTP-only session cookie
     headers: {
       "Content-Type": "application/json",
+      "X-Requested-With": "XMLHttpRequest", // CSRF protection
       ...(options?.headers ?? {}),
     },
     ...options,

@@ -2,6 +2,8 @@ import { Router } from "express";
 import axios from "axios";
 import { prisma } from "../lib/prisma";
 import { getSpotifyProfile } from "../lib/spotify";
+import { config } from "../config";
+import { encrypt } from "../lib/crypto";
 
 const router = Router();
 
@@ -9,8 +11,8 @@ const SPOTIFY_ACCOUNTS = "https://accounts.spotify.com";
 
 // GET /api/auth/login - Redirects to Spotify authorization page
 router.get("/login", (_req, res) => {
-  const clientId = process.env.SPOTIFY_CLIENT_ID ?? "";
-  const redirectUri = process.env.SPOTIFY_REDIRECT_URI ?? "";
+  const clientId = config.spotifyClientId;
+  const redirectUri = config.spotifyRedirectUri;
 
   const scope = [
     "user-read-private",
@@ -33,7 +35,7 @@ router.get("/login", (_req, res) => {
 // GET /api/auth/callback - Spotify redirects here after user authorization
 router.get("/callback", async (req, res) => {
   const { code, error } = req.query;
-  const frontendUrl = process.env.FRONTEND_URL ?? "http://localhost:5173";
+  const frontendUrl = config.frontendUrl;
 
   if (error || !code) {
     res.redirect(`${frontendUrl}?error=access_denied`);
@@ -45,9 +47,9 @@ router.get("/callback", async (req, res) => {
     const params = new URLSearchParams({
       grant_type: "authorization_code",
       code: code as string,
-      redirect_uri: process.env.SPOTIFY_REDIRECT_URI ?? "",
-      client_id: process.env.SPOTIFY_CLIENT_ID ?? "",
-      client_secret: process.env.SPOTIFY_CLIENT_SECRET ?? "",
+      redirect_uri: config.spotifyRedirectUri,
+      client_id: config.spotifyClientId,
+      client_secret: config.spotifyClientSecret,
     });
 
     const tokenResponse = await axios.post<{
@@ -64,15 +66,17 @@ router.get("/callback", async (req, res) => {
     // Fetch user profile
     const profile = await getSpotifyProfile(access_token);
 
-    // Upsert user in database
+    // Encrypt refresh token
+    const encryptedRefreshToken = encrypt(refresh_token);
+
+    // Upsert user in database (no access token)
     await prisma.user.upsert({
       where: { id: profile.id },
       update: {
         displayName: profile.display_name,
         email: profile.email,
         avatarUrl: profile.images?.[0]?.url ?? null,
-        accessToken: access_token,
-        refreshToken: refresh_token,
+        encryptedRefreshToken,
         tokenExpiresAt: expiresAt,
       },
       create: {
@@ -80,16 +84,16 @@ router.get("/callback", async (req, res) => {
         displayName: profile.display_name,
         email: profile.email,
         avatarUrl: profile.images?.[0]?.url ?? null,
-        accessToken: access_token,
-        refreshToken: refresh_token,
+        encryptedRefreshToken,
         tokenExpiresAt: expiresAt,
       },
     });
 
-    // Set session userId, then explicitly wait for the store to persist the
-    // session row before redirecting. Without save(), the redirect fires before
-    // Postgres commits the row and the subsequent /me call returns 401.
+    // Set session userId, accessToken, and expiration
     req.session.userId = profile.id;
+    req.session.accessToken = access_token;
+    req.session.tokenExpiresAt = expiresAt;
+
     req.session.save((err) => {
       if (err) {
         console.error("Session save error:", err);

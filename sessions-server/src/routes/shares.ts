@@ -146,6 +146,15 @@ router.get("/:token", async (req, res) => {
       return;
     }
 
+    if (link.visibility === "SPECIFIC_USER") {
+      if (!req.session.userId || req.session.userId !== link.sharedWithUserId) {
+        res
+          .status(403)
+          .json({ error: "You are not authorized to view this session" });
+        return;
+      }
+    }
+
     if (link.expiresAt && link.expiresAt < new Date()) {
       res.status(410).json({ error: "This share link has expired" });
       return;

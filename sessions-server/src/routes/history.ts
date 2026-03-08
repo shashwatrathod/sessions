@@ -7,6 +7,7 @@ import {
   refreshTrackPopularities,
 } from "../lib/spotify";
 import { groupTracksIntoSessions } from "../lib/sessions";
+import { config } from "../config";
 
 const router = Router();
 
@@ -27,7 +28,7 @@ router.get("/sync", async (req, res) => {
     });
 
     const afterMs = mostRecent ? mostRecent.playedAt.getTime() : undefined;
-    const tracks = await getRecentlyPlayed(userId, afterMs);
+    const tracks = await getRecentlyPlayed(userId, req.session, afterMs);
 
     if (tracks.length === 0) {
       res.json({ synced: 0, message: "Already up to date" });
@@ -54,7 +55,7 @@ router.get("/sync", async (req, res) => {
 
     // 3. Refresh popularities for new tracks in the background (best-effort)
     const newTrackIds = [...new Set(tracks.map((t) => t.trackId))];
-    refreshTrackPopularities(userId, newTrackIds).catch((err) =>
+    refreshTrackPopularities(userId, req.session, newTrackIds).catch((err) =>
       console.warn("Popularity refresh failed:", err),
     );
 
@@ -70,7 +71,10 @@ router.get("/sync", async (req, res) => {
 router.get("/sessions", async (req, res) => {
   const userId = req.session.userId!;
   const page = Math.max(1, Number(req.query.page) || 1);
-  const limit = Math.max(1, Math.min(Number(req.query.limit) || 20, 50));
+  const limit = Math.max(
+    1,
+    Math.min(Number(req.query.limit) || 20, config.sessionsPageLimitMax),
+  );
 
   try {
     const histories = await prisma.playHistory.findMany({

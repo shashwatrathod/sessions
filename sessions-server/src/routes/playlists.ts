@@ -39,6 +39,7 @@ router.post("/", async (req, res) => {
     // Create the playlist on Spotify
     const playlist = await createPlaylist(
       userId,
+      req.session,
       name,
       description ??
         `A listening session from ${new Date(sessionStartTime).toLocaleDateString()}`,
@@ -46,7 +47,7 @@ router.post("/", async (req, res) => {
     );
 
     // Add tracks to the playlist
-    await addTracksToPlaylist(userId, playlist.id, trackUris);
+    await addTracksToPlaylist(userId, req.session, playlist.id, trackUris);
 
     // Save the session record in our DB
     const saved = await prisma.savedSession.create({
@@ -95,7 +96,9 @@ router.get("/saved", async (req, res) => {
     });
 
     // Batch-fetch album art from the shared tracks table
-    const allUris = [...new Set(sessions.flatMap((s) => s.trackUris))];
+    const allUris = [
+      ...new Set(sessions.flatMap((s: { trackUris: string[] }) => s.trackUris)),
+    ];
     const trackArt = allUris.length
       ? await prisma.track.findMany({
           where: { uri: { in: allUris } },
@@ -104,10 +107,13 @@ router.get("/saved", async (req, res) => {
       : [];
 
     const artByUri = new Map<string, string>(
-      trackArt.map((t) => [t.uri, t.albumArt]),
+      trackArt.map((t: { uri: string; albumArt: string }) => [
+        t.uri,
+        t.albumArt,
+      ]),
     );
 
-    const enriched = sessions.map((s) => {
+    const enriched = sessions.map((s: { trackUris: string[] }) => {
       const seen = new Set<string>();
       const previewImages: string[] = [];
       for (const uri of s.trackUris) {

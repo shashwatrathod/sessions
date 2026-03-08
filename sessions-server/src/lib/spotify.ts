@@ -1,5 +1,7 @@
 import axios, { AxiosError } from "axios";
 import { prisma } from "./prisma";
+import { config } from "../config";
+import { encrypt, decrypt } from "./crypto";
 
 const SPOTIFY_API = "https://api.spotify.com/v1";
 const SPOTIFY_ACCOUNTS = "https://accounts.spotify.com";
@@ -17,20 +19,32 @@ export interface SpotifyTrack {
 
 // --- Token management ---
 
-async function getValidAccessToken(userId: string): Promise<string> {
+export async function getValidAccessToken(
+  userId: string,
+  session: import("express-session").Session &
+    Partial<import("express-session").SessionData>,
+): Promise<string> {
+  // If token is in session and still valid (with 60s buffer), return it
+  if (
+    session.accessToken &&
+    session.tokenExpiresAt &&
+    new Date(session.tokenExpiresAt) > new Date(Date.now() + 60_000)
+  ) {
+    return session.accessToken;
+  }
+
+  // Token is missing or expired, we need to refresh it.
   const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
 
-  // If token is still valid (with 60s buffer), return it
-  if (user.tokenExpiresAt > new Date(Date.now() + 60_000)) {
-    return user.accessToken;
-  }
+  // Decrypt the refresh token
+  const refreshToken = decrypt(user.encryptedRefreshToken);
 
   // Refresh the token
   const params = new URLSearchParams({
     grant_type: "refresh_token",
-    refresh_token: user.refreshToken,
-    client_id: process.env.SPOTIFY_CLIENT_ID ?? "",
-    client_secret: process.env.SPOTIFY_CLIENT_SECRET ?? "",
+    refresh_token: refreshToken,
+    client_id: config.spotifyClientId,
+    client_secret: config.spotifyClientSecret,
   });
 
   const response = await axios.post<{
@@ -41,17 +55,36 @@ async function getValidAccessToken(userId: string): Promise<string> {
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
   });
 
-  const { access_token, expires_in, refresh_token } = response.data;
+  const {
+    access_token,
+    expires_in,
+    refresh_token: new_refresh_token,
+  } = response.data;
   const expiresAt = new Date(Date.now() + expires_in * 1000);
 
-  await prisma.user.update({
-    where: { id: userId },
-    data: {
-      accessToken: access_token,
-      tokenExpiresAt: expiresAt,
-      ...(refresh_token ? { refreshToken: refresh_token } : {}),
-    },
-  });
+  // If a new refresh token is provided, encrypt and save it
+  if (new_refresh_token) {
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        encryptedRefreshToken: encrypt(new_refresh_token),
+        tokenExpiresAt: expiresAt, // Keep DB timestamp in sync
+      },
+    });
+  } else {
+    // Just update the expiration time in the DB
+    await prisma.user.update({
+      where: { id: userId },
+      data: { tokenExpiresAt: expiresAt },
+    });
+  }
+
+  // Save the new access token to the session
+  session.accessToken = access_token;
+  session.tokenExpiresAt = expiresAt;
+
+  // NOTE: The caller route must eventually respond, which triggers session auto-save,
+  // or explicitly call session.save().
 
   return access_token;
 }
@@ -64,9 +97,10 @@ function spotifyHeaders(token: string) {
 
 export async function getRecentlyPlayed(
   userId: string,
+  session: import("express-session").Session,
   after?: number,
 ): Promise<SpotifyTrack[]> {
-  const token = await getValidAccessToken(userId);
+  const token = await getValidAccessToken(userId, session);
 
   const params: Record<string, string | number> = { limit: 50 };
   if (after !== undefined) params.after = after;
@@ -156,10 +190,11 @@ export async function upsertTracks(tracks: SpotifyTrack[]): Promise<void> {
  */
 export async function refreshTrackPopularities(
   userId: string,
+  session: import("express-session").Session,
   trackIds: string[],
 ): Promise<void> {
   if (trackIds.length === 0) return;
-  const token = await getValidAccessToken(userId);
+  const token = await getValidAccessToken(userId, session);
 
   const BATCH = 50;
   for (let i = 0; i < trackIds.length; i += BATCH) {
@@ -207,11 +242,12 @@ export async function getSpotifyProfile(accessToken: string): Promise<{
 
 export async function createPlaylist(
   userId: string,
+  session: import("express-session").Session,
   name: string,
   description: string,
   isPublic: boolean,
 ): Promise<{ id: string; external_urls: { spotify: string } }> {
-  const token = await getValidAccessToken(userId);
+  const token = await getValidAccessToken(userId, session);
 
   const response = await axios.post(
     `${SPOTIFY_API}/me/playlists`,
@@ -226,10 +262,11 @@ export async function createPlaylist(
 
 export async function addTracksToPlaylist(
   userId: string,
+  session: import("express-session").Session,
   playlistId: string,
   trackUris: string[],
 ): Promise<void> {
-  const token = await getValidAccessToken(userId);
+  const token = await getValidAccessToken(userId, session);
 
   // Spotify allows max 100 tracks per request
   const BATCH_SIZE = 100;
