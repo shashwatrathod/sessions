@@ -14,6 +14,9 @@ import { errorHandler } from "./middleware/errorHandler";
 const app = express();
 const port = config.port;
 
+// Trust the reverse proxy (Render load balancer) so that secure cookies are properly set via HTTPS.
+app.set("trust proxy", 1);
+
 // CORS — allow the frontend origin with credentials
 app.use(
   cors({
