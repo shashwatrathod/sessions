@@ -34,6 +34,7 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
       headers: {
         "Content-Type": "application/json",
         "X-Requested-With": "XMLHttpRequest", // CSRF protection
+        "X-Timezone-Offset": String(new Date().getTimezoneOffset()),
         ...(options?.headers ?? {}),
       },
       ...options,

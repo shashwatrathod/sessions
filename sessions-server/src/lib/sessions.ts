@@ -24,6 +24,7 @@ const SESSION_GAP_MS = config.sessionGapMinutes * 60 * 1000;
  */
 export function groupTracksIntoSessions(
   tracks: PlayHistoryWithTrack[],
+  timezoneOffsetMinutes: number = 0,
 ): Session[] {
   if (tracks.length === 0) return [];
 
@@ -41,7 +42,7 @@ export function groupTracksIntoSessions(
     const gap = curr.playedAt.getTime() - prev.playedAt.getTime();
 
     if (gap > SESSION_GAP_MS) {
-      sessions.push(makeSession(currentGroup));
+      sessions.push(makeSession(currentGroup, timezoneOffsetMinutes));
       currentGroup = [curr];
     } else {
       currentGroup.push(curr);
@@ -49,14 +50,17 @@ export function groupTracksIntoSessions(
   }
 
   if (currentGroup.length > 0) {
-    sessions.push(makeSession(currentGroup));
+    sessions.push(makeSession(currentGroup, timezoneOffsetMinutes));
   }
 
   // Return newest sessions first
   return sessions.reverse();
 }
 
-function makeSession(tracks: PlayHistoryWithTrack[]): Session {
+function makeSession(
+  tracks: PlayHistoryWithTrack[],
+  timezoneOffsetMinutes: number,
+): Session {
   const start = tracks[0].playedAt;
   const end = tracks[tracks.length - 1].playedAt;
 
@@ -81,7 +85,7 @@ function makeSession(tracks: PlayHistoryWithTrack[]): Session {
     trackCount: tracks.length,
     tracks,
     previewImages,
-    tags: computeTags(tracks, start),
+    tags: computeTags(tracks, start, timezoneOffsetMinutes),
   };
 }
 
@@ -94,9 +98,16 @@ function makeSession(tracks: PlayHistoryWithTrack[]): Session {
 export function computeTags(
   tracks: PlayHistoryWithTrack[],
   sessionStart: Date,
+  timezoneOffsetMinutes: number,
 ): string[] {
   const tags: string[] = [];
-  const hour = sessionStart.getHours();
+
+  // Calculate the user's local hour in UTC
+  const localTimeMs =
+    sessionStart.getTime() - timezoneOffsetMinutes * 60 * 1000;
+  const localDate = new Date(localTimeMs);
+  const hour = localDate.getUTCHours();
+
   const durationMs =
     tracks[tracks.length - 1].playedAt.getTime() - tracks[0].playedAt.getTime();
   const durationHours = durationMs / (1000 * 60 * 60);

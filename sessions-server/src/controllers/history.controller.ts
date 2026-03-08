@@ -18,10 +18,13 @@ export class HistoryController {
       Math.min(Number(req.query.limit) || 20, config.sessionsPageLimitMax),
     );
 
+    const offset = Number(req.headers["x-timezone-offset"]) || 0;
+
     const result = await HistoryService.getPaginatedSessions(
       userId,
       page,
       limit,
+      offset,
     );
 
     res.set("Cache-Control", "private, max-age=300");
@@ -31,8 +34,9 @@ export class HistoryController {
   static getSessionDetail = catchAsync(async (req: Request, res: Response) => {
     const userId = req.session.userId!;
     const { id } = req.params;
+    const offset = Number(req.headers["x-timezone-offset"]) || 0;
 
-    const result = await HistoryService.getSessionDetail(userId, id);
+    const result = await HistoryService.getSessionDetail(userId, id, offset);
 
     res.set("Cache-Control", "private, max-age=3600");
     res.json(result);

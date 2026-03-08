@@ -52,6 +52,7 @@ export class HistoryService {
     userId: string,
     page: number,
     limit: number,
+    timezoneOffsetMinutes: number = 0,
   ) {
     const histories = await prisma.playHistory.findMany({
       where: { userId },
@@ -59,7 +60,7 @@ export class HistoryService {
       include: { track: true },
     });
 
-    const sessions = groupTracksIntoSessions(histories);
+    const sessions = groupTracksIntoSessions(histories, timezoneOffsetMinutes);
     const startIndex = (page - 1) * limit;
     const paginatedSessions = sessions.slice(startIndex, startIndex + limit);
 
@@ -80,7 +81,11 @@ export class HistoryService {
     };
   }
 
-  static async getSessionDetail(userId: string, id: string) {
+  static async getSessionDetail(
+    userId: string,
+    id: string,
+    timezoneOffsetMinutes: number = 0,
+  ) {
     const match = id.match(/^session_(\d+)_(\d+)$/);
     if (!match) {
       throw { statusCode: 400, message: "Invalid session ID" };
@@ -92,7 +97,7 @@ export class HistoryService {
       include: { track: true },
     });
 
-    const sessions = groupTracksIntoSessions(histories);
+    const sessions = groupTracksIntoSessions(histories, timezoneOffsetMinutes);
     const session = sessions.find((s: any) => s.id === id);
 
     if (!session) {
