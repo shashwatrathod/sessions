@@ -112,6 +112,83 @@ export async function getRecentlyPlayed(
   }
 }
 
+/**
+ * Upserts track metadata into the shared `tracks` table.
+ * Call this during sync so PlayHistory can reference tracks by ID.
+ */
+export async function upsertTracks(tracks: SpotifyTrack[]): Promise<void> {
+  if (tracks.length === 0) return;
+
+  // Deduplicate by trackId (same track may appear multiple times in a sync batch)
+  const unique = new Map<string, SpotifyTrack>();
+  for (const t of tracks) unique.set(t.trackId, t);
+
+  await prisma.$transaction(
+    Array.from(unique.values()).map((t) =>
+      prisma.track.upsert({
+        where: { id: t.trackId },
+        update: {
+          // Always refresh name/art in case Spotify updated them
+          name: t.trackName,
+          artistNames: t.artistNames,
+          albumName: t.albumName,
+          albumArt: t.albumArt,
+          durationMs: t.durationMs,
+          uri: t.trackUri,
+        },
+        create: {
+          id: t.trackId,
+          uri: t.trackUri,
+          name: t.trackName,
+          artistNames: t.artistNames,
+          albumName: t.albumName,
+          albumArt: t.albumArt,
+          durationMs: t.durationMs,
+        },
+      }),
+    ),
+  );
+}
+
+/**
+ * Fetches track popularities from Spotify in batches of 50 and updates
+ * the `popularity` field on existing Track records.
+ */
+export async function refreshTrackPopularities(
+  userId: string,
+  trackIds: string[],
+): Promise<void> {
+  if (trackIds.length === 0) return;
+  const token = await getValidAccessToken(userId);
+
+  const BATCH = 50;
+  for (let i = 0; i < trackIds.length; i += BATCH) {
+    const batch = trackIds.slice(i, i + BATCH);
+    try {
+      const response = await axios.get<{
+        tracks: Array<{ id: string; popularity: number } | null>;
+      }>(`${SPOTIFY_API}/tracks`, {
+        headers: spotifyHeaders(token),
+        params: { ids: batch.join(",") },
+      });
+
+      await prisma.$transaction(
+        response.data.tracks
+          .filter((t): t is { id: string; popularity: number } => t !== null)
+          .map((t) =>
+            prisma.track.update({
+              where: { id: t.id },
+              data: { popularity: t.popularity },
+            }),
+          ),
+      );
+    } catch (err) {
+      // Non-fatal — popularity is optional
+      console.warn("Failed to refresh track popularities for batch:", err);
+    }
+  }
+}
+
 // --- User profile ---
 
 export async function getSpotifyProfile(accessToken: string): Promise<{

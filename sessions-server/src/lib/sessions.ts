@@ -1,23 +1,29 @@
-import { PlayHistory } from "@prisma/client";
+import { PlayHistory, Track } from "@prisma/client";
+
+// PlayHistory joined with its Track record
+export type PlayHistoryWithTrack = PlayHistory & { track: Track };
 
 export interface Session {
   id: string;
   startTime: Date;
   endTime: Date;
   trackCount: number;
-  tracks: PlayHistory[];
+  tracks: PlayHistoryWithTrack[];
   // Album art images for the preview thumbnail grid
   previewImages: string[];
+  tags: string[];
 }
 
 // 30 minutes of inactivity = new session
 const SESSION_GAP_MS = 30 * 60 * 1000;
 
 /**
- * Groups a sorted (descending) list of PlayHistory records into listening sessions.
+ * Groups a sorted list of PlayHistoryWithTrack records into listening sessions.
  * Sessions are defined by gaps of SESSION_GAP_MS or more between consecutive plays.
  */
-export function groupTracksIntoSessions(tracks: PlayHistory[]): Session[] {
+export function groupTracksIntoSessions(
+  tracks: PlayHistoryWithTrack[],
+): Session[] {
   if (tracks.length === 0) return [];
 
   // Sort ascending by playedAt
@@ -26,7 +32,7 @@ export function groupTracksIntoSessions(tracks: PlayHistory[]): Session[] {
   );
 
   const sessions: Session[] = [];
-  let currentGroup: PlayHistory[] = [sorted[0]];
+  let currentGroup: PlayHistoryWithTrack[] = [sorted[0]];
 
   for (let i = 1; i < sorted.length; i++) {
     const prev = sorted[i - 1];
@@ -34,7 +40,6 @@ export function groupTracksIntoSessions(tracks: PlayHistory[]): Session[] {
     const gap = curr.playedAt.getTime() - prev.playedAt.getTime();
 
     if (gap > SESSION_GAP_MS) {
-      // Flush current group and start new one
       sessions.push(makeSession(currentGroup));
       currentGroup = [curr];
     } else {
@@ -42,7 +47,6 @@ export function groupTracksIntoSessions(tracks: PlayHistory[]): Session[] {
     }
   }
 
-  // Flush last group
   if (currentGroup.length > 0) {
     sessions.push(makeSession(currentGroup));
   }
@@ -51,7 +55,7 @@ export function groupTracksIntoSessions(tracks: PlayHistory[]): Session[] {
   return sessions.reverse();
 }
 
-function makeSession(tracks: PlayHistory[]): Session {
+function makeSession(tracks: PlayHistoryWithTrack[]): Session {
   const start = tracks[0].playedAt;
   const end = tracks[tracks.length - 1].playedAt;
 
@@ -62,9 +66,9 @@ function makeSession(tracks: PlayHistory[]): Session {
   const seen = new Set<string>();
   const previewImages: string[] = [];
   for (const t of tracks) {
-    if (t.albumArt && !seen.has(t.albumArt)) {
-      seen.add(t.albumArt);
-      previewImages.push(t.albumArt);
+    if (t.track.albumArt && !seen.has(t.track.albumArt)) {
+      seen.add(t.track.albumArt);
+      previewImages.push(t.track.albumArt);
       if (previewImages.length >= 4) break;
     }
   }
@@ -76,5 +80,43 @@ function makeSession(tracks: PlayHistory[]): Session {
     trackCount: tracks.length,
     tracks,
     previewImages,
+    tags: computeTags(tracks, start),
   };
+}
+
+// --- Auto-tagging ---
+
+/**
+ * Derives descriptive tags for a session based on time-of-day and listening patterns.
+ * All logic is local — no extra API calls needed.
+ */
+export function computeTags(
+  tracks: PlayHistoryWithTrack[],
+  sessionStart: Date,
+): string[] {
+  const tags: string[] = [];
+  const hour = sessionStart.getHours();
+  const durationMs =
+    tracks[tracks.length - 1].playedAt.getTime() - tracks[0].playedAt.getTime();
+  const durationHours = durationMs / (1000 * 60 * 60);
+
+  // Time-of-day tags
+  if (hour >= 0 && hour < 5) tags.push("🌙 Late Night");
+  else if (hour >= 5 && hour < 9) tags.push("🌅 Early Morning");
+  else if (hour >= 9 && hour < 12) tags.push("🌤 Morning");
+  else if (hour >= 12 && hour < 17) tags.push("☀️ Afternoon");
+  else if (hour >= 17 && hour < 21) tags.push("🌆 Evening");
+  else tags.push("🌃 Night");
+
+  // Session length
+  if (durationHours >= 3) tags.push("📺 Binge Session");
+  else if (durationHours >= 1.5) tags.push("🎧 Long Session");
+
+  // Focus block: long session but few unique tracks (implies repeats)
+  const uniqueTrackIds = new Set(tracks.map((t) => t.trackId));
+  if (durationHours >= 1 && uniqueTrackIds.size <= 5) {
+    tags.push("🎯 Focus Block");
+  }
+
+  return tags;
 }

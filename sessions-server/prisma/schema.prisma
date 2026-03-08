@@ -22,28 +22,59 @@ model User {
   tokenExpiresAt DateTime
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
-  tracks         PlayHistory[]
+  playHistories  PlayHistory[]
   savedSessions  SavedSession[]
+  savedTracks    UserSavedTrack[]
 
   @@map("users")
 }
 
-model PlayHistory {
-  id          String   @id @default(cuid())
-  playedAt    DateTime // deduplication key per user
-  trackId     String
-  trackUri    String
-  trackName   String
+// Normalised track metadata — shared across all users
+model Track {
+  id          String   @id // Spotify track ID
+  uri         String   @unique
+  name        String
   artistNames String[]
   albumName   String
   albumArt    String
   durationMs  Int
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  popularity  Int?     // 0-100; fetched from Spotify GET /tracks/:id
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  @@unique([userId, playedAt]) // prevent duplicate play events per user
+  playHistories  PlayHistory[]
+  savedByUsers   UserSavedTrack[]
+
+  @@map("tracks")
+}
+
+model PlayHistory {
+  id       String   @id @default(cuid())
+  playedAt DateTime
+  trackId  String
+  userId   String
+
+  track Track @relation(fields: [trackId], references: [id])
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, playedAt])
   @@index([userId, playedAt])
   @@map("play_histories")
+}
+
+// Per-user bookmarked tracks ("Save for Later")
+model UserSavedTrack {
+  id      String   @id @default(cuid())
+  savedAt DateTime @default(now())
+  userId  String
+  trackId String
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  track Track @relation(fields: [trackId], references: [id])
+
+  @@unique([userId, trackId])
+  @@index([userId])
+  @@map("user_saved_tracks")
 }
 
 model SavedSession {
@@ -57,9 +88,33 @@ model SavedSession {
   trackUris          String[]
   userId             String
   user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shareLinks         ShareLink[]
 
   @@index([userId])
   @@map("saved_sessions")
+}
+
+// Shareable deep-link tokens for saved sessions
+model ShareLink {
+  id               String          @id @default(cuid())
+  token            String          @unique @default(cuid())
+  savedSessionId   String
+  visibility       ShareVisibility @default(PRIVATE)
+  sharedWithUserId String?         // populated for SPECIFIC_USER grants
+  expiresAt        DateTime?
+  createdAt        DateTime        @default(now())
+
+  savedSession SavedSession @relation(fields: [savedSessionId], references: [id], onDelete: Cascade)
+
+  @@index([savedSessionId])
+  @@index([token])
+  @@map("share_links")
+}
+
+enum ShareVisibility {
+  PRIVATE
+  LINK_ANYONE
+  SPECIFIC_USER
 }
 
 model Session {

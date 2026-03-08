@@ -7,6 +7,7 @@ import { Pool } from "pg";
 import authRouter from "./routes/auth";
 import historyRouter from "./routes/history";
 import playlistsRouter from "./routes/playlists";
+import sharesRouter from "./routes/shares";
 
 const app = express();
 const port = process.env.PORT ?? 3000;
@@ -51,6 +52,7 @@ app.use(
 app.use("/api/auth", authRouter);
 app.use("/api/history", historyRouter);
 app.use("/api/playlists", playlistsRouter);
+app.use("/api/shares", sharesRouter);
 
 // Health check
 app.get("/api/health", (_req, res) => {

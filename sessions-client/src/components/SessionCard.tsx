@@ -4,10 +4,11 @@ import { getDominantColor, colorToCss } from "../lib/colors";
 
 interface Props {
   session: SessionSummary;
+  savedName?: string; // custom name set by user when saving
   onClick: () => void;
 }
 
-export default function SessionCard({ session, onClick }: Props) {
+export default function SessionCard({ session, savedName, onClick }: Props) {
   const [accentColor, setAccentColor] = useState<[number, number, number]>([
     29, 185, 84,
   ]);
@@ -75,6 +76,15 @@ export default function SessionCard({ session, onClick }: Props) {
         {session.previewImages.length === 0 && (
           <div className="card-no-art">🎵</div>
         )}
+        {/* Saved name badge */}
+        {savedName && (
+          <div className="card-saved-badge">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+            </svg>
+            {savedName}
+          </div>
+        )}
       </div>
 
       {/* Card meta */}
@@ -99,6 +109,15 @@ export default function SessionCard({ session, onClick }: Props) {
             ~{durationMins} min
           </span>
         </div>
+        {session.tags?.length > 0 && (
+          <div className="card-tags">
+            {session.tags.slice(0, 2).map((tag) => (
+              <span key={tag} className="tag-chip" style={{ color: accentCss }}>
+                {tag}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="card-arrow">
@@ -134,7 +153,29 @@ const cardStyles = `
   border-color: var(--accent-border, rgba(255,255,255,0.16));
 }
 
+.card-saved-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: rgba(0,0,0,0.65);
+  backdrop-filter: blur(8px);
+  color: #fff;
+  max-width: calc(100% - 20px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
 .card-images {
+  position: relative;
   display: grid;
   grid-template-columns: 1fr 1fr;
   height: 160px;
@@ -199,5 +240,21 @@ const cardStyles = `
   opacity: 1;
   transform: translateX(0);
   color: var(--text-primary);
+}
+
+.card-tags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+.tag-chip {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.08);
+  white-space: nowrap;
 }
 `;

@@ -69,9 +69,24 @@ h2,
 h3,
 h4,
 h5 {
-  font-family: "Outfit", sans-serif;
-  font-weight: 700;
-  letter-spacing: -0.02em;
+  font-family: "Cal Sans", "Outfit", sans-serif;
+  font-weight: 600;
+  letter-spacing: 0.1rem;
+}
+
+/* ============================================
+   Header branding (shared across all pages)
+   ============================================ */
+.header-logo {
+  opacity: 1;
+}
+.header-brand {
+  font-family: "Cal Sans", "Outfit", sans-serif;
+  font-size: 21px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: #ffffff;
+  filter: drop-shadow(0 0 12px rgba(29, 185, 84, 0.45));
 }
 
 a {

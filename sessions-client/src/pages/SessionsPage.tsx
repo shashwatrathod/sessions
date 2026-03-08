@@ -6,7 +6,13 @@ import {
 } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { getMe, logout, getSessions, syncHistory } from "../lib/api";
+import {
+  getMe,
+  logout,
+  getSessions,
+  syncHistory,
+  getSavedSessions,
+} from "../lib/api";
 import SessionCard from "../components/SessionCard";
 import { useState } from "react";
 
@@ -32,6 +38,21 @@ export default function SessionsPage() {
   });
 
   const sessions = sessionsData?.pages.flatMap((p) => p.data) ?? [];
+
+  // Fetch saved sessions to overlay friendly names on session cards
+  const { data: savedSessions = [] } = useQuery({
+    queryKey: ["savedSessions"],
+    queryFn: getSavedSessions,
+    staleTime: 60_000,
+  });
+
+  // Build a map: virtualSessionId → custom saved name
+  const savedNameMap = new Map(
+    savedSessions.map((s) => [
+      `session_${new Date(s.startTime).getTime()}_${new Date(s.endTime).getTime()}`,
+      s.name,
+    ]),
+  );
 
   const logoutMutation = useMutation({
     mutationFn: logout,
@@ -67,6 +88,15 @@ export default function SessionsPage() {
           </div>
 
           <div className="flex items-center gap-3">
+            <button
+              className="btn btn-ghost"
+              onClick={() => navigate("/saved-sessions")}
+              id="saved-sessions-btn"
+            >
+              <BookmarkIcon />
+              Saved
+            </button>
+
             <button
               className="btn btn-ghost"
               onClick={handleSync}
@@ -174,6 +204,7 @@ export default function SessionsPage() {
                   >
                     <SessionCard
                       session={session}
+                      savedName={savedNameMap.get(session.id)}
                       onClick={() =>
                         navigate(`/sessions/${encodeURIComponent(session.id)}`)
                       }
@@ -220,6 +251,22 @@ function SyncIcon({ spinning }: { spinning: boolean }) {
   );
 }
 
+function BookmarkIcon() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+    >
+      <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+    </svg>
+  );
+}
+
 function LogoutIcon() {
   return (
     <svg
@@ -248,14 +295,6 @@ const sessionsStyles = `
   top: 0;
   z-index: 50;
 }
-.header-logo { opacity: 0.9; }
-.header-brand {
-  font-family: 'Outfit', sans-serif;
-  font-size: 18px;
-  font-weight: 700;
-  letter-spacing: -0.03em;
-}
-
 .user-pill {
   display: flex;
   align-items: center;

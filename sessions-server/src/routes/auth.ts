@@ -112,8 +112,6 @@ router.get("/callback", async (req, res) => {
 
 // GET /api/auth/me - Returns current logged-in user's profile
 router.get("/me", async (req, res) => {
-  console.log("[/me] cookies:", req.headers.cookie);
-  console.log("[/me] session:", req.session);
   if (!req.session.userId) {
     res.status(401).json({ error: "Not authenticated" });
     return;

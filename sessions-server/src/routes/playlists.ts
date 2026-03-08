@@ -74,7 +74,7 @@ router.post("/", async (req, res) => {
 });
 
 // GET /playlists/saved
-// Returns the user's saved sessions from the DB
+// Returns the user's saved sessions enriched with album art preview images
 router.get("/saved", async (req, res) => {
   const userId = req.session.userId!;
 
@@ -94,7 +94,34 @@ router.get("/saved", async (req, res) => {
       },
     });
 
-    res.json(sessions);
+    // Batch-fetch album art from the shared tracks table
+    const allUris = [...new Set(sessions.flatMap((s) => s.trackUris))];
+    const trackArt = allUris.length
+      ? await prisma.track.findMany({
+          where: { uri: { in: allUris } },
+          select: { uri: true, albumArt: true },
+        })
+      : [];
+
+    const artByUri = new Map<string, string>(
+      trackArt.map((t) => [t.uri, t.albumArt]),
+    );
+
+    const enriched = sessions.map((s) => {
+      const seen = new Set<string>();
+      const previewImages: string[] = [];
+      for (const uri of s.trackUris) {
+        const art = artByUri.get(uri);
+        if (art && !seen.has(art)) {
+          seen.add(art);
+          previewImages.push(art);
+          if (previewImages.length >= 4) break;
+        }
+      }
+      return { ...s, previewImages };
+    });
+
+    res.json(enriched);
   } catch (err) {
     console.error("Saved sessions error:", err);
     res.status(500).json({ error: "Failed to load saved sessions" });
@@ -131,6 +158,77 @@ router.patch("/saved/:id", async (req, res) => {
   } catch (err) {
     console.error("Rename session error:", err);
     res.status(500).json({ error: "Failed to rename session" });
+  }
+});
+
+// POST /playlists/save-session
+// Saves a listening session to the DB with a custom name — no Spotify playlist required.
+router.post("/save-session", async (req, res) => {
+  const userId = req.session.userId!;
+  const { name, trackUris, sessionStartTime, sessionEndTime } = req.body as {
+    name: string;
+    trackUris: string[];
+    sessionStartTime: string;
+    sessionEndTime: string;
+  };
+
+  if (
+    !name?.trim() ||
+    !trackUris?.length ||
+    !sessionStartTime ||
+    !sessionEndTime
+  ) {
+    res.status(400).json({
+      error:
+        "Missing required fields: name, trackUris, sessionStartTime, sessionEndTime",
+    });
+    return;
+  }
+
+  try {
+    const saved = await prisma.savedSession.create({
+      data: {
+        name: name.trim(),
+        startTime: new Date(sessionStartTime),
+        endTime: new Date(sessionEndTime),
+        trackUris,
+        userId,
+      },
+    });
+
+    res.json({
+      id: saved.id,
+      name: saved.name,
+      startTime: saved.startTime.toISOString(),
+      endTime: saved.endTime.toISOString(),
+      createdAt: saved.createdAt.toISOString(),
+    });
+  } catch (err) {
+    console.error("Save session error:", err);
+    res.status(500).json({ error: "Failed to save session" });
+  }
+});
+
+// DELETE /playlists/saved/:id
+// Deletes a saved session (must belong to the current user)
+router.delete("/saved/:id", async (req, res) => {
+  const userId = req.session.userId!;
+  const { id } = req.params;
+
+  try {
+    const session = await prisma.savedSession.findFirst({
+      where: { id, userId },
+    });
+    if (!session) {
+      res.status(404).json({ error: "Session not found" });
+      return;
+    }
+
+    await prisma.savedSession.delete({ where: { id } });
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Delete session error:", err);
+    res.status(500).json({ error: "Failed to delete session" });
   }
 });
 

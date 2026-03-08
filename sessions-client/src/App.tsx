@@ -5,6 +5,7 @@ import { getMe } from "./lib/api";
 import LoginPage from "./pages/LoginPage";
 import SessionsPage from "./pages/SessionsPage";
 import SessionDetailPage from "./pages/SessionDetailPage";
+import SavedSessionsPage from "./pages/SavedSessionsPage";
 import "./index.css";
 
 const queryClient = new QueryClient({
@@ -54,6 +55,14 @@ export default function App() {
             element={
               <AuthGuard>
                 <SessionDetailPage />
+              </AuthGuard>
+            }
+          />
+          <Route
+            path="/saved-sessions"
+            element={
+              <AuthGuard>
+                <SavedSessionsPage />
               </AuthGuard>
             }
           />

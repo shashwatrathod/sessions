@@ -6,6 +6,7 @@ import { getSessionDetail } from "../lib/api";
 import { getDominantColor, colorToCss } from "../lib/colors";
 import TrackRow from "../components/TrackRow";
 import SavePlaylistModal from "../components/SavePlaylistModal";
+import SaveSessionModal from "../components/SaveSessionModal";
 
 export default function SessionDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -14,6 +15,7 @@ export default function SessionDetailPage() {
     29, 185, 84,
   ]);
   const [showSaveModal, setShowSaveModal] = useState(false);
+  const [showSaveSessionModal, setShowSaveSessionModal] = useState(false);
 
   const {
     data: session,
@@ -145,19 +147,47 @@ export default function SessionDetailPage() {
                 {totalMins} minutes
               </p>
 
-              <button
-                className="btn btn-primary save-btn"
-                style={{
-                  background: accentCss,
-                  color: "#000",
-                  boxShadow: `0 8px 24px ${colorToCss(accentColor, 0.4)}`,
-                }}
-                onClick={() => setShowSaveModal(true)}
-                id="save-playlist-btn"
-              >
-                <SaveIcon />
-                Save as Playlist
-              </button>
+              {/* Auto-tags */}
+              {session.tags?.length > 0 && (
+                <div
+                  className="flex gap-2 flex-wrap"
+                  style={{ marginBottom: 20 }}
+                >
+                  {session.tags.map((tag) => (
+                    <span
+                      key={tag}
+                      className="tag-chip detail-tag"
+                      style={{ color: accentCss }}
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex gap-3 flex-wrap">
+                <button
+                  className="btn btn-ghost save-btn"
+                  onClick={() => setShowSaveSessionModal(true)}
+                  id="save-session-btn"
+                >
+                  <BookmarkIcon />
+                  Save Session
+                </button>
+                <button
+                  className="btn btn-primary save-btn"
+                  style={{
+                    background: accentCss,
+                    color: "#000",
+                    boxShadow: `0 8px 24px ${colorToCss(accentColor, 0.4)}`,
+                  }}
+                  onClick={() => setShowSaveModal(true)}
+                  id="save-playlist-btn"
+                >
+                  <SaveIcon />
+                  Save as Playlist
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -187,8 +217,32 @@ export default function SessionDetailPage() {
         />
       )}
 
+      {showSaveSessionModal && (
+        <SaveSessionModal
+          session={session}
+          accentColor={accentColor}
+          onClose={() => setShowSaveSessionModal(false)}
+        />
+      )}
+
       <style>{detailStyles}</style>
     </div>
+  );
+}
+
+function BookmarkIcon() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+    >
+      <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+    </svg>
   );
 }
 
@@ -278,6 +332,15 @@ const detailStyles = `
 .save-btn {
   font-size: 15px;
   padding: 12px 24px;
+}
+
+.detail-tag {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.12);
 }
 
 .track-list { display: flex; flex-direction: column; gap: 2px; }
