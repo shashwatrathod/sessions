@@ -1,0 +1,59 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider   = "prisma-client-js"
+  output     = "../node_modules/.prisma/client"
+  engineType = "library"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String        @id // Spotify user ID
+  displayName    String
+  email          String?
+  avatarUrl      String?
+  accessToken    String
+  refreshToken   String
+  tokenExpiresAt DateTime
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  tracks         PlayHistory[]
+  savedSessions  SavedSession[]
+}
+
+model PlayHistory {
+  id          String   @id @default(cuid())
+  playedAt    DateTime // deduplication key per user
+  trackId     String
+  trackUri    String
+  trackName   String
+  artistNames String[]
+  albumName   String
+  albumArt    String
+  durationMs  Int
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, playedAt]) // prevent duplicate play events per user
+  @@index([userId, playedAt])
+}
+
+model SavedSession {
+  id                String   @id @default(cuid())
+  name              String
+  createdAt         DateTime @default(now())
+  startTime         DateTime
+  endTime           DateTime
+  spotifyPlaylistId String?
+  spotifyPlaylistUrl String?
+  trackUris         String[]
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
